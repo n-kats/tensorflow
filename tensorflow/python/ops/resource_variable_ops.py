@@ -2362,10 +2362,11 @@ def write_object_proto_for_resource_variable(resource_variable, proto, options):
     options: A `SaveOption` instance that configures save behavior.
   """
   proto.variable.SetInParent()
-  if not resource_variable.name.endswith(":0"):
+  if not (resource_variable.name.endswith(":0")
+          or resource_variable.name == "ShardedVariable"):
     raise ValueError(f"Cowardly refusing to save variable "
                      f"{resource_variable.name} because of "
-                     f"unexpected suffix in the name (':0') "
+                     f"unexpected suffix in the name (expected ':0')"
                      f"which won't be restored.")
   proto.variable.name = meta_graph._op_name(resource_variable.name)  # pylint: disable=protected-access
   proto.variable.trainable = resource_variable.trainable
