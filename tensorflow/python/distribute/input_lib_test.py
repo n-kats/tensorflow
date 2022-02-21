@@ -1798,6 +1798,11 @@ class DistributedIteratorTfDataServiceTest(DistributedIteratorTestBase,
 
     dist_dataset = input_util.get_distributed_dataset(dataset, input_workers,
                                                       distribution)
+    histogram_proto = (
+        input_lib._distributed_dataset_initialization_time_seconds.get_cell(
+            distribution.__class__.__name__, "1").value())
+    self.assertGreater(histogram_proto.num, 0.0)
+    self.assertGreater(histogram_proto.min, 0.0)
 
     iterator = iter(dist_dataset)
     results = []
