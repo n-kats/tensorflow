@@ -1907,6 +1907,79 @@ LogicalResult BitcastConvertOp::reifyReturnTypeShapes(
       &builder, getOperation(), operands.front(), &reifiedReturnShapes);
 }
 
+/*
+ * We intend to verify the following properties
+ * P1. The dimensions of the operand and the target shape must match, apart
+ * from the last dimension which will change by the ratio of the primitive size
+ * before and after the conversion.
+ * (https://www.tensorflow.org/xla/operation_semantics#bitcastconverttype)
+ * P2. We cannot convert between complex and real types (cf xla)
+ * P3. Final dimensions must be the same in-memory size (accounting for bit
+ * width)
+ */
+LogicalResult BitcastConvertOp::verify() {
+  auto operand_type = operand().getType().dyn_cast<RankedTensorType>();
+  auto target_type = getResult().getType().dyn_cast<RankedTensorType>();
+  if (!operand_type || !target_type) return success();
+
+  // P1.
+  auto target_shape = target_type.getShape();
+  auto operand_shape = operand_type.getShape();
+  if (!target_shape.empty() && !operand_shape.empty()) {
+    auto target_shape_prefix = target_shape.drop_back();
+    auto operand_shape_prefix = operand_shape.drop_back();
+    for (auto [target_dim, operand_dim] :
+         llvm::zip(target_shape_prefix, operand_shape_prefix)) {
+      if (!isDynamicDimSize(target_dim) && !isDynamicDimSize(operand_dim)) {
+        if (target_dim != operand_dim) {
+          return emitOpError()
+                 << "target and operand shapes must match in their non-final "
+                 << "positions. Got: " << target_shape << " and "
+                 << operand_shape << ".";
+        }
+      }
+    }
+  }
+
+  // P2. TODO(atondwal): is this a valid part of the spec or an XLA quirk?
+  auto target_shape_elt = target_type.getElementType();
+  auto operand_shape_elt = operand_type.getElementType();
+  if (target_shape_elt.isa<ComplexType>() !=
+      operand_shape_elt.isa<ComplexType>()) {
+    return emitOpError() << "cannot convert between real and complex types.";
+  }
+
+  // P3.
+  auto target_shape_bit_width = target_shape_elt.isa<ComplexType>()
+                                    ? target_shape_elt.dyn_cast<ComplexType>()
+                                          .getElementType()
+                                          .getIntOrFloatBitWidth()
+                                    : target_shape_elt.getIntOrFloatBitWidth();
+  auto operand_shape_bit_width =
+      operand_shape_elt.isa<ComplexType>()
+          ? operand_shape_elt.dyn_cast<ComplexType>()
+                .getElementType()
+                .getIntOrFloatBitWidth()
+          : operand_shape_elt.getIntOrFloatBitWidth();
+  if (target_shape.empty() && operand_shape.empty() &&
+      target_shape_bit_width == operand_shape_bit_width)
+    return success();
+  auto target_shape_final = target_shape[target_shape.size() - 1];
+  auto operand_shape_final = operand_shape[operand_shape.size() - 1];
+  if (!isDynamicDimSize(target_shape_final) &&
+      !isDynamicDimSize(operand_shape_final)) {
+    if (target_shape_bit_width * target_shape_final !=
+        operand_shape_bit_width * operand_shape_final) {
+      return emitOpError()
+             << "target and operand final dimensions and elements must match. "
+             << "Got: " << target_shape << ", " << target_shape_elt << " and "
+             << operand_shape << ", " << operand_shape_elt;
+    }
+  }
+
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // BroadcastOp
 //===----------------------------------------------------------------------===//
