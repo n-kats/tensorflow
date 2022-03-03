@@ -2393,6 +2393,7 @@ def HLO_ReducePrecisionOp :
     I32Attr:$exponent_bits,
     I32Attr:$mantissa_bits
   );
+  let hasVerifier = 1;
   let results = (outs HLO_FpTensor:$output);
 }
 
