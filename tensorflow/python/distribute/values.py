@@ -134,6 +134,23 @@ class DistributedValues(object):
   the subclass, the values could either be synced on update, synced on demand,
   or never synced.
 
+  Two representative types of `tf.distribute.DistributedValues` are `PerReplica`
+  and `Mirrored` values.
+
+  `PerReplica` values exist on the worker devices, with a different value for
+  each replica. They are produced by iterating through a distributed dataset
+  returned by `tf.distribute.Strategy.experimental_distribute_dataset` and
+  `tf.distribute.Strategy.distribute_datasets_from_function`. They are also the
+  typical result returned by `tf.distribute.Strategy.run`.
+
+  `Mirrored` values are like `PerReplica` values, except we know that the value
+  on all replicas are the same. `Mirrored` values are kept synchronized by the
+  distribution strategy in use, while `PerReplica` values are kept
+  unsynchronized. `Mirrored` values typically represent model weights. We can
+  safely read a `Mirrored` value in a cross-replica context by using the value
+  on any replica, while PerReplica values can only be read within a replica
+  context.
+
   `tf.distribute.DistributedValues` can be reduced to obtain single value across
   replicas, as input into `tf.distribute.Strategy.run` or the per-replica values
   inspected using `tf.distribute.Strategy.experimental_local_results`.
