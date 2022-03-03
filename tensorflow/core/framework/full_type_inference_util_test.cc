@@ -420,6 +420,67 @@ TEST(MultiaryUnstack, Three) {
   ASSERT_EQ(rt.args(0).args(0).args(2).args(0).type_id(), TFT_INT64);
 }
 
+TEST(MapContainer, One) {
+  FullTypeDef t1;
+  t1.set_type_id(TFT_PRODUCT);
+  FullTypeDef* cont_t = t1.add_args();
+  cont_t->set_type_id(TFT_DATASET);
+  FullTypeDef* el_t = cont_t->add_args();
+  el_t->set_type_id(TFT_PRODUCT);
+  (el_t->add_args())->set_type_id(TFT_TENSOR);
+
+  const auto ret = ContainerMap(0, MapTensor)({t1});
+  TF_EXPECT_OK(ret.status());
+
+  const FullTypeDef& rt = ret.ValueOrDie();
+  EXPECT_EQ(rt.type_id(), TFT_PRODUCT);
+  ASSERT_EQ(rt.args_size(), 1);
+  EXPECT_EQ(rt.args(0).type_id(), TFT_DATASET);
+  ASSERT_EQ(rt.args(0).args_size(), 1);
+  ASSERT_EQ(rt.args(0).args(0).type_id(), TFT_PRODUCT);
+  ASSERT_EQ(rt.args(0).args(0).args_size(), 1);
+  ASSERT_EQ(rt.args(0).args(0).args(0).type_id(), TFT_TENSOR);
+}
+
+TEST(MapContainer, Three) {
+  FullTypeDef t1;
+  t1.set_type_id(TFT_ANY);
+  FullTypeDef t2;
+  t2.set_type_id(TFT_PRODUCT);
+  FullTypeDef* cont_t = t2.add_args();
+  cont_t->set_type_id(TFT_DATASET);
+  FullTypeDef* el_t = cont_t->add_args();
+  el_t->set_type_id(TFT_PRODUCT);
+  FullTypeDef* e1 = el_t->add_args();
+  e1->set_type_id(TFT_RAGGED);
+  e1->add_args()->set_type_id(TFT_STRING);
+  FullTypeDef* e2 = el_t->add_args();
+  e2->set_type_id(TFT_TENSOR);
+  FullTypeDef* e3 = el_t->add_args();
+  e3->set_type_id(TFT_RAGGED);
+  e3->add_args()->set_type_id(TFT_INT64);
+  FullTypeDef t3;
+  t3.set_type_id(TFT_ANY);
+
+  const auto ret = ContainerMap(1, MapTensor)({t1, t2, t3});
+  TF_EXPECT_OK(ret.status());
+
+  const FullTypeDef& rt = ret.ValueOrDie();
+  EXPECT_EQ(rt.type_id(), TFT_PRODUCT);
+  ASSERT_EQ(rt.args_size(), 1);
+  EXPECT_EQ(rt.args(0).type_id(), TFT_DATASET);
+  ASSERT_EQ(rt.args(0).args_size(), 1);
+  ASSERT_EQ(rt.args(0).args(0).type_id(), TFT_PRODUCT);
+  ASSERT_EQ(rt.args(0).args(0).args_size(), 3);
+  ASSERT_EQ(rt.args(0).args(0).args(0).type_id(), TFT_RAGGED);
+  ASSERT_EQ(rt.args(0).args(0).args(0).args_size(), 1);
+  ASSERT_EQ(rt.args(0).args(0).args(0).args(0).type_id(), TFT_STRING);
+  ASSERT_EQ(rt.args(0).args(0).args(1).type_id(), TFT_TENSOR);
+  ASSERT_EQ(rt.args(0).args(0).args(2).type_id(), TFT_RAGGED);
+  ASSERT_EQ(rt.args(0).args(0).args(2).args_size(), 1);
+  ASSERT_EQ(rt.args(0).args(0).args(2).args(0).type_id(), TFT_INT64);
+}
+
 }  // namespace
 
 }  // namespace full_type

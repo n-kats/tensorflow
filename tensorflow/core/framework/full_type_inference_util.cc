@@ -198,6 +198,59 @@ FullTypeDef UnstackTensor(const FullTypeDef& t) {
   return t;
 }
 
+ForwardTypeInferenceFn ContainerMap(
+    int i, std::function<FullTypeDef(const FullTypeDef&)> map) {
+  // Given a FullTypeDef from the it'th input with the structure
+  //   Product[Dataset[Product[TENSOR[...]]]]
+  // create an output
+  //   Product[Dataset[Product[map(TENSOR[...])]]]
+  // For now, only TFT_DATASET is supported as the container. Other container
+  // types can be added in the future.
+  // TFT_UNSET is also allowed to support weak type inference where
+  // not having a fulltype is allowed.
+  return [i, map](const std::vector<std::reference_wrapper<const FullTypeDef>>&
+                      input_types) {
+    DCHECK_GE(input_types.size(), i);
+    const FullTypeDef& in_type = input_types.at(i).get();
+    FullTypeDef ret_type;
+    if (in_type.type_id() != TFT_UNSET) {
+      DCHECK_EQ(in_type.type_id(), TFT_PRODUCT);
+      DCHECK_EQ(in_type.args_size(), 1);
+      const FullTypeDef& in_cont_t = in_type.args(0);
+      DCHECK_EQ(in_cont_t.type_id(), TFT_DATASET);
+      DCHECK_EQ(in_cont_t.args_size(), 1);
+      const FullTypeDef& in_el_t = in_cont_t.args(0);
+      DCHECK_EQ(in_el_t.type_id(), TFT_PRODUCT);
+
+      ret_type.set_type_id(TFT_PRODUCT);
+      FullTypeDef* out_cont_t = ret_type.add_args();
+      out_cont_t->set_type_id(in_cont_t.type_id());
+      FullTypeDef* out_el_t = out_cont_t->add_args();
+      out_el_t->set_type_id(TFT_PRODUCT);
+      for (int k = 0; k < in_el_t.args_size(); k++) {
+        *(out_el_t->add_args()) = map(in_el_t.args(k));
+      }
+    }
+    return ret_type;
+  };
+}
+
+FullTypeDef MapTensor(const FullTypeDef& t) {
+  // For now, only TFT_TENSOR and TFT_RAGGED are supported and
+  // only if they have a single argument (i.e. they don't specify a shape).
+  // If these have a shape in the future, this function needs to changed
+  // so that the output shape is computed based on the input shape and the
+  // effect of the particular map operation, e.g the effect of an op
+  // that changes the batch size (and this function would require more
+  // information to do this computation).
+  // TFT_UNSET is also allowed to support weak type inference where
+  // not having a fulltype is allowed.
+  DCHECK((t.type_id() == TFT_TENSOR) || (t.type_id() == TFT_RAGGED) ||
+         (t.type_id() == TFT_UNSET));
+  DCHECK_LE(t.args_size(), 1);
+  return t;
+}
+
 }  // namespace full_type
 
 }  // namespace tensorflow
