@@ -31,6 +31,7 @@ limitations under the License.
 #include "tensorflow/lite/builtin_ops.h"
 #include "tensorflow/lite/c/builtin_op_data.h"
 #include "tensorflow/lite/c/common.h"
+#include "tensorflow/lite/core/api/profiler.h"
 #include "tensorflow/lite/delegates/xnnpack/quantization_util.h"
 #include "tensorflow/lite/kernels/internal/compatibility.h"
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
@@ -584,6 +585,14 @@ class Subgraph {
       TF_LITE_KERNEL_LOG(context, "failed to create XNNPACK runtime");
       return nullptr;
     }
+    if (context->profiler) {
+      status = xnn_profile_execution(runtime_ptr);
+      if (status != xnn_status_success) {
+        TF_LITE_KERNEL_LOG(context,
+                           "failed to create XNNPACK runtime profiler");
+        return nullptr;
+      }
+    }
 
     return new Subgraph(delegate, runtime_ptr, externals);
   }
@@ -632,6 +641,19 @@ class Subgraph {
     if (status != xnn_status_success) {
       TF_LITE_KERNEL_LOG(context, "failed to invoke XNNPACK runtime");
       return kTfLiteError;
+    }
+    if (context->profiler) {
+      Profiler* profiler = reinterpret_cast<Profiler*>(context->profiler);
+
+      xnn_profiler* xnn_profile = xnn_get_profile(runtime_.get());
+      for (size_t i = 0; i < xnn_profile->num_ops; ++i) {
+        if (xnn_profile->op_profiles[i].name != NULL) {
+          profiler->AddEvent(xnn_profile->op_profiles[i].name,
+                             Profiler::EventType::OPERATOR_INVOKE_EVENT,
+                             xnn_profile->op_profiles[i].start_time,
+                             xnn_profile->op_profiles[i].end_time, i, 0);
+        }
+      }
     }
 
     return kTfLiteOk;

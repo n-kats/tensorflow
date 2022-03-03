@@ -16,6 +16,7 @@ limitations under the License.
 #define TENSORFLOW_LITE_CORE_API_PROFILER_H_
 
 #include <cstdint>
+#include <cstring>
 
 namespace tflite {
 
@@ -105,14 +106,15 @@ class ScopedProfile {
   ScopedProfile(Profiler* profiler, const char* tag,
                 Profiler::EventType event_type = Profiler::EventType::DEFAULT,
                 int64_t event_metadata = 0)
-      : profiler_(profiler), event_handle_(0) {
-    if (profiler) {
+      : profiler_(profiler), event_handle_(0), profiling_(false) {
+    if (profiler && strcmp(tag, "TfLiteXNNPackDelegate")) {
+      profiling_ = true;
       event_handle_ = profiler_->BeginEvent(tag, event_type, event_metadata);
     }
   }
 
   ~ScopedProfile() {
-    if (profiler_) {
+    if (profiling_) {
       profiler_->EndEvent(event_handle_);
     }
   }
@@ -120,6 +122,7 @@ class ScopedProfile {
  protected:
   Profiler* profiler_;
   uint32_t event_handle_;
+  bool profiling_;
 };
 
 class ScopedOperatorProfile : public ScopedProfile {
