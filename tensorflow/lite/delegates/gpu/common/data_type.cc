@@ -20,6 +20,20 @@ limitations under the License.
 
 namespace tflite {
 namespace gpu {
+namespace {
+bool IsFloatDataType(DataType data_type) {
+  return data_type == DataType::FLOAT64 || data_type == DataType::FLOAT32 ||
+         data_type == DataType::FLOAT16;
+}
+bool IsIntDataType(DataType data_type) {
+  return data_type == DataType::INT64 || data_type == DataType::INT32 ||
+         data_type == DataType::INT16 || data_type == DataType::INT8;
+}
+bool IsUintDataType(DataType data_type) {
+  return data_type == DataType::UINT64 || data_type == DataType::UINT32 ||
+         data_type == DataType::UINT16 || data_type == DataType::UINT8;
+}
+}  // namespace
 
 size_t SizeOf(DataType data_type) {
   switch (data_type) {
@@ -134,6 +148,41 @@ std::string ToMetalDataType(DataType data_type, int vec_size) {
       return "unknown";
   }
   return "undefined";
+}
+
+std::string ToGlslShaderDataType(DataType data_type, int vec_size,
+                                 bool add_precision, bool explicit_fp16) {
+  std::string scalar_type = "unknown";
+  std::string vec_type = "unknown";
+  std::string precision_modifier;
+  if (SizeOf(data_type) >= 4) {
+    precision_modifier = "highp";
+  } else if (SizeOf(data_type) == 2) {
+    precision_modifier = "mediump";
+  } else if (SizeOf(data_type) == 1) {
+    precision_modifier = "lowp";
+  }
+  if (IsFloatDataType(data_type)) {
+    scalar_type = "float";
+    vec_type = "vec";
+    if (explicit_fp16 && data_type == DataType::FLOAT16) {
+      scalar_type = "float16_t";
+      vec_type = "f16vec";
+      precision_modifier = "";
+    }
+  } else if (IsIntDataType(data_type)) {
+    scalar_type = "int";
+    vec_type = "ivec";
+  } else if (IsUintDataType(data_type)) {
+    scalar_type = "uint";
+    vec_type = "uvec";
+  }
+  std::string kernel_type =
+      vec_size == 1 ? scalar_type : vec_type + std::to_string(vec_size);
+  if (add_precision && !precision_modifier.empty()) {
+    kernel_type = precision_modifier + " " + kernel_type;
+  }
+  return kernel_type;
 }
 
 }  // namespace gpu

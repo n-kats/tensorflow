@@ -37,13 +37,17 @@ enum class DataType {
   INT64 = 11,
 };
 
-size_t SizeOf(DataType type);
+size_t SizeOf(DataType data_type);
 
-std::string ToString(DataType t);
+std::string ToString(DataType data_type);
 
 std::string ToCLDataType(DataType data_type, int vec_size = 1);
 
 std::string ToMetalDataType(DataType data_type, int vec_size = 1);
+
+std::string ToGlslShaderDataType(DataType data_type, int vec_size = 1,
+                                 bool add_precision = true,
+                                 bool explicit_fp16 = false);
 
 }  // namespace gpu
 }  // namespace tflite
