@@ -248,7 +248,7 @@ def _convert_tf1_model(flags):
   if flags.dump_graphviz_dir:
     converter.dump_graphviz_dir = flags.dump_graphviz_dir
   if flags.dump_graphviz_video:
-    converter.dump_graphviz_vode = flags.dump_graphviz_video
+    converter.dump_graphviz_video = flags.dump_graphviz_video
   if flags.conversion_summary_dir:
     converter.conversion_summary_dir = flags.conversion_summary_dir
 
